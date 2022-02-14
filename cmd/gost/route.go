@@ -522,6 +522,15 @@ func (r *route) GenRouters() ([]router, error) {
 				Gateway: node.Get("gw"),
 			}
 			ln, err = gost.TapListener(cfg)
+		case "vpn":
+			cfg := gost.VPNConfig{
+				Name:   node.Get("name"),
+				Addr:   node.Get("net"),
+				Peer:   node.Get("peer"),
+				MTU:    node.GetInt("mtu"),
+				FwMark: 0,
+			}
+			ln, err = gost.VPNListener(cfg)
 		case "ftcp":
 			ln, err = gost.FakeTCPListener(
 				node.Addr,
@@ -586,6 +595,8 @@ func (r *route) GenRouters() ([]router, error) {
 			handler = gost.TunHandler()
 		case "tap":
 			handler = gost.TapHandler()
+		case "vpn":
+			handler = gost.VPNHandler()
 		case "dns":
 			handler = gost.DNSHandler(node.Remote)
 		case "relay":

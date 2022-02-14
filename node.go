@@ -87,6 +87,7 @@ func ParseNode(s string) (node Node, err error) {
 	case "tcp", "udp":
 	case "rtcp", "rudp": // rtcp and rudp are for remote port forwarding
 	case "tun", "tap": // tun/tap device
+	case "vpn":
 	case "ftcp": // fake TCP
 	case "dns":
 	case "redu", "redirectu": // UDP tproxy
@@ -109,6 +110,7 @@ func ParseNode(s string) (node Node, err error) {
 	case "direct", "remote", "forward": // forwarding
 	case "red", "redirect", "redu", "redirectu": // TCP,UDP transparent proxy
 	case "tun", "tap": // tun/tap device
+	case "vpn":
 	case "ftcp": // fake TCP
 	case "dns", "dot", "doh":
 	case "relay":
