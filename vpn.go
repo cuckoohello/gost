@@ -1,6 +1,7 @@
 package gost
 
 import (
+	"context"
 	"net"
 	"sync"
 
@@ -30,7 +31,7 @@ type vpnListener struct {
 	device   device.Device
 }
 
-func VpnListener(cfg VPNConfig) (Listener, error) {
+func VPNListener(cfg VPNConfig) (Listener, error) {
 	if cfg.FwMark != 0 {
 		dialer.SetMark(cfg.FwMark)
 	}
@@ -103,6 +104,19 @@ type vpnHandler struct {
 	chExit  chan struct{}
 }
 
+// TapHandler creates a handler for tap tunnel.
+func VPNHandler(opts ...HandlerOption) Handler {
+	h := &vpnHandler{
+		options: &HandlerOptions{},
+		chExit:  make(chan struct{}, 1),
+	}
+	for _, opt := range opts {
+		opt(h.options)
+	}
+
+	return h
+}
+
 func (h *vpnHandler) Init(options ...HandlerOption) {
 	if h.options == nil {
 		h.options = &HandlerOptions{}
@@ -113,16 +127,54 @@ func (h *vpnHandler) Init(options ...HandlerOption) {
 }
 
 func (h *vpnHandler) Handle(conn net.Conn) {
+	defer conn.Close()
 
-	if tcpConn, ok := conn.(adapter.TCPConn); ok {
-		h.HandleTCPConn(tcpConn)
-	} else if udpConn, ok := conn.(adapter.UDPConn); ok {
-		h.HandleUDPConn(udpConn)
+	network := conn.RemoteAddr().Network()
+	raddr := conn.RemoteAddr().String()
+
+	log.Logf("[vpn] [%s] %s -> %s", network, conn.LocalAddr(), conn.RemoteAddr())
+
+	retries := 1
+	if h.options.Chain != nil && h.options.Chain.Retries > 0 {
+		retries = h.options.Chain.Retries
 	}
-}
+	if h.options.Retries > 0 {
+		retries = h.options.Retries
+	}
 
-func (h *vpnHandler) HandleTCPConn(conn adapter.TCPConn) {
-}
+	if !Can(network, raddr, h.options.Whitelist, h.options.Blacklist) {
+		log.Logf("[vpn] %s -> %s : is forbidden",
+			conn.LocalAddr(), conn.RemoteAddr())
+		return
+	}
 
-func (h *vpnHandler) HandleUDPConn(conn adapter.UDPConn) {
+	ctx := context.TODO()
+	var cc net.Conn
+	var err error
+	for i := 0; i < retries; i++ {
+		cc, err = h.options.Chain.DialContext(ctx,
+			network, raddr,
+			RetryChainOption(h.options.Retries),
+			TimeoutChainOption(h.options.Timeout),
+		)
+		if err != nil {
+			log.Logf("[vpn] %s -> %s : %s", conn.RemoteAddr(), raddr, err)
+		} else {
+			break
+		}
+	}
+
+	if err != nil {
+		return
+	}
+	defer cc.Close()
+
+	transport(conn, cc) /* relay connections */
+
+	// select {
+	// case <-h.chExit:
+	// 	return
+	// default:
+	// }
+
 }
