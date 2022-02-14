@@ -1,6 +1,9 @@
 package gost
 
 import (
+	"fmt"
+	"net"
+
 	"github.com/go-log/log"
 	"github.com/milosgajdos/tenus"
 	"github.com/xjasonlyu/tun2socks/v2/core/device"
@@ -15,10 +18,10 @@ func createDevice(cfg VPNConfig) (device device.Device, addr net.Addr, err error
 	}
 	addr = &net.IPAddr{IP: ip}
 
-	device, err := tun.Open(cfg.Name, uint32(cfg.MTU))
+	device, err = tun.Open(cfg.Name, uint32(cfg.MTU))
 	if err != nil {
 		log.Logf("[vpn] open tun %s failed: %v", cfg.Name, err)
-		return nil, err
+		return
 	}
 
 	link, err := tenus.NewLinkFrom(cfg.Name)
@@ -39,4 +42,5 @@ func createDevice(cfg VPNConfig) (device device.Device, addr net.Addr, err error
 		err = fmt.Errorf("%s: %v", cmd, er)
 		return
 	}
+	return
 }
